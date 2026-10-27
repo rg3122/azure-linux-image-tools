@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/azure-linux-image-tools/toolkit/tools/imagecustomizerapi"
 	"github.com/microsoft/azure-linux-image-tools/toolkit/tools/internal/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateAzureLinuxOciUriAZL2Latest(t *testing.T) {
@@ -77,13 +78,33 @@ func TestParseInputImageAZLEmptyVariant(t *testing.T) {
 }
 
 func TestCustomizeImageAZLBaseImageConfigValid(t *testing.T) {
+	for _, baseImageInfo := range baseImageAzureLinuxAll {
+		t.Run(baseImageInfo.Name, func(t *testing.T) {
+			testCustomizeImageAZLBaseImageConfigValid(t, baseImageInfo)
+		})
+	}
+}
+
+func testCustomizeImageAZLBaseImageConfigValid(t *testing.T, baseImageInfo testBaseImageInfo) {
 	testutils.CheckSkipForCustomizeImageRequirements(t)
 
-	testTmpDir := filepath.Join(tmpDir, "TestCustomizeImageAZLBaseImageConfigValid")
+	testTmpDir := filepath.Join(tmpDir, "TestCustomizeImageAZLBaseImageConfigValid"+baseImageInfo.ImageName)
 	defer os.RemoveAll(testTmpDir)
 
 	buildDir := filepath.Join(testTmpDir, "build")
-	configFile := filepath.Join(testDir, "azurelinux-base-image.yaml")
+
+	var configFile string
+	switch baseImageInfo.Version {
+	case baseImageVersionAzl2:
+		configFile = filepath.Join(testDir, "base-image-azl2.yaml")
+
+	case baseImageVersionAzl3:
+		configFile = filepath.Join(testDir, "base-image-azl3.yaml")
+
+	case baseImageVersionAzl4:
+		configFile = filepath.Join(testDir, "base-image-azl4.yaml")
+	}
+
 	outImageFilePath := filepath.Join(testTmpDir, "image.raw")
 
 	options := ImageCustomizerOptions{
@@ -100,10 +121,8 @@ func TestCustomizeImageAZLBaseImageConfigValid(t *testing.T) {
 		return
 	}
 
-	imageConnection, err := connectToAzureLinuxCoreEfiImage(buildDir, outImageFilePath)
-	if !assert.NoError(t, err) {
-		return
-	}
+	imageConnection, err := testutils.ConnectToImage(buildDir, outImageFilePath, true, baseImageInfo.MountPoints)
+	require.NoError(t, err)
 	defer imageConnection.Close()
 
 	// Ensure hostname was correctly set.
